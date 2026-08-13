@@ -1,0 +1,18 @@
+.idea/
+# Dependencies
+node_modules/
+# Environment files
+.env
+backend/.env
+../Marketplace/frontend/.env
+# Frontend build
+../Marketplace/frontend/dist/
+# SQLite database
+../Marketplace/backend/data/*
+!../Marketplace/backend/data/.gitkeep
+# Uploaded files
+../Marketplace/backend/uploads/*
+!../Marketplace/backend/uploads/avatars/
+!../Marketplace/backend/uploads/listings/
+!../Marketplace/backend/uploads/avatars/.gitkeep
+!../Marketplace/backend/uploads/listings/.gitkeep
