@@ -1,0 +1,38 @@
+.bubble-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.bubble-row--mine {
+  justify-content: flex-end;
+}
+.bubble {
+  max-width: min(72%, 460px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-sm);
+  padding: 0.55rem 0.8rem;
+}
+.bubble--mine {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-sm);
+}
+.bubble__text {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubble__time {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--color-text-subtle);
+  text-align: right;
+}
+.bubble--mine .bubble__time {
+  color: rgba(255, 255, 255, 0.75);
+}

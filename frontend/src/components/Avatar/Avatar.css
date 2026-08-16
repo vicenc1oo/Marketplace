@@ -1,0 +1,30 @@
+.avatar {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+}
+.avatar__img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  background: var(--color-surface-2);
+}
+.avatar__status {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 28%;
+  height: 28%;
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+}
+.avatar__status--online {
+  background: var(--color-success);
+}
+.avatar__status--offline {
+  background: var(--color-text-subtle);
+}

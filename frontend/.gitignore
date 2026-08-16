@@ -1,0 +1,10 @@
+# Dependencies & build
+node_modules/
+dist/
+
+# Local env (keep .env.example committed)
+.env
+
+# Tooling / session artifacts — never commit
+.playwright-mcp/
+.remember/

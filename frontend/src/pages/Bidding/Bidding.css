@@ -1,0 +1,55 @@
+.bidding__tabs {
+  margin-bottom: var(--space-5);
+}
+.bidding__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bidding__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+.bidding__row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+.bidding__thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.bidding__row-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bidding__row-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bidding__row-meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.bidding__row-time {
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.bidding__row-status {
+  flex-shrink: 0;
+}

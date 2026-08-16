@@ -1,0 +1,88 @@
+.bid-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+.bid-panel__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.bid-panel__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.bid-panel__amount {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.bid-panel__count {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.bid-panel__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+.bid-panel__time.is-ended {
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+}
+.bid-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bid-panel__closed {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.bid-history {
+  display: flex;
+  flex-direction: column;
+}
+.bid-history__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.bid-history__row:last-child {
+  border-bottom: none;
+}
+.bid-history__who {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.bid-history__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.bid-history__time {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.bid-history__amount {
+  font-weight: 600;
+}
+.bid-history__amount.is-top {
+  color: var(--color-success);
+}
