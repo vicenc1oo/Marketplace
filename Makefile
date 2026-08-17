@@ -51,6 +51,7 @@ db-seed:
  	$(COMPOSE) exec backend npm run db:seed:wallets
  	$(COMPOSE) exec backend npm run db:seed:promotion-packages
  	$(COMPOSE) exec backend npm run db:seed:listings
+ 	$(COMPOSE) exec backend npm run db:seed:reviews
 
 db-setup: db-migrate db-seed
 

@@ -1,17 +1,39 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: transcendence-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - transcendence
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: marketplace-backend
-    env_file:
-      - ./backend/.env
-    environment:
-      PORT: 3000
-      DATABASE_PATH: /app/data/database.sqlite
-    volumes:
-      - backend_data:/app/data
-      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      environment:
+        PORT: 3000
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_NAME: ${DB_NAME}
+        DB_USER: ${DB_USER}
+        DB_PASSWORD: ${DB_PASSWORD}
+      volumes:
+        - backend_data:/app/data
+        - backend_uploads:/app/uploads
     expose:
       - "3000"
     networks:
@@ -45,3 +67,4 @@ networks:
 volumes:
   backend_data:
   backend_uploads:
+  postgres_data:
