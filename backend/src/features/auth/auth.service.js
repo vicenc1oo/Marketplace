@@ -9,7 +9,7 @@ const usersByEmail = new Map();
 let seedPromise = null;
 
  /* Production users */
-const DEFAULT_PASSWORD = 'Password1';
+const DEFAULT_PASSWORD = 'User1234';
 const seedUsers = [
     {
         id: 'u1',
@@ -195,10 +195,26 @@ async function forgotPassword(email) {
     return { ok: true };
 }
 
+async function listUsers() {
+    await ensureSeedUsers();
+    return Array.from(usersById.values()).map(toPublicUser);
+}
+
+async function updateUserProfile(userId, patch) {
+    await ensureSeedUsers();
+    const user = usersById.get(userId);
+    if (!user) return null;
+
+    Object.assign(user, patch);
+    return toPublicUser(user);
+}
+
 module.exports = {
     DEFAULT_PASSWORD,
     login,
     register,
     findUserById,
     forgotPassword,
+    listUsers,
+    updateUserProfile,
 };
