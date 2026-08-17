@@ -7,25 +7,25 @@ import { SocketProvider } from './context/SocketContext.jsx';
 import { CurrencyProvider } from './context/CurrencyContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 
-import Layout from '../../../Marketplace/frontend/src/components/Layout/Layout.jsx';
-import ProtectedRoute from '../../../Marketplace/frontend/src/components/Layout/ProtectedRoute.jsx';
+import Layout from './components/Layout/Layout.jsx';
+import ProtectedRoute from './components/Layout/ProtectedRoute.jsx';
 
-import Home from '../../../Marketplace/frontend/src/pages/Home/Home.jsx';
-import Login from '../../../Marketplace/frontend/src/pages/Auth/Login.jsx';
-import Register from '../../../Marketplace/frontend/src/pages/Auth/Register.jsx';
-import ForgotPassword from '../../../Marketplace/frontend/src/pages/Auth/ForgotPassword.jsx';
-import Marketplace from '../../../Marketplace/frontend/src/pages/Marketplace/Marketplace.jsx';
-import ListingDetails from '../../../Marketplace/frontend/src/pages/ListingDetails/ListingDetails.jsx';
-import CreateListing from '../../../Marketplace/frontend/src/pages/CreateListing/CreateListing.jsx';
-import Bidding from '../../../Marketplace/frontend/src/pages/Bidding/Bidding.jsx';
-import Chat from '../../../Marketplace/frontend/src/pages/Chat/Chat.jsx';
-import Profile from '../../../Marketplace/frontend/src/pages/Profile/Profile.jsx';
-import Dashboard from '../../../Marketplace/frontend/src/pages/Dashboard/Dashboard.jsx';
-import Wallet from '../../../Marketplace/frontend/src/pages/Wallet/Wallet.jsx';
-import Promotions from '../../../Marketplace/frontend/src/pages/Promotions/Promotions.jsx';
-import PrivacyPolicy from '../../../Marketplace/frontend/src/pages/PrivacyPolicy/PrivacyPolicy.jsx';
-import TermsOfService from '../../../Marketplace/frontend/src/pages/TermsOfService/TermsOfService.jsx';
-import NotFound from '../../../Marketplace/frontend/src/pages/NotFound/NotFound.jsx';
+import Home from './pages/Home/Home.jsx';
+import Login from './pages/Auth/Login.jsx';
+import Register from './pages/Auth/Register.jsx';
+import ForgotPassword from './pages/Auth/ForgotPassword.jsx';
+import Marketplace from './pages/Marketplace/Marketplace.jsx';
+import ListingDetails from './pages/ListingDetails/ListingDetails.jsx';
+import CreateListing from './pages/CreateListing/CreateListing.jsx';
+import Bidding from './pages/Bidding/Bidding.jsx';
+import Chat from './pages/Chat/Chat.jsx';
+import Profile from './pages/Profile/Profile.jsx';
+import Dashboard from './pages/Dashboard/Dashboard.jsx';
+import Wallet from './pages/Wallet/Wallet.jsx';
+import Promotions from './pages/Promotions/Promotions.jsx';
+import PrivacyPolicy from './pages/PrivacyPolicy/PrivacyPolicy.jsx';
+import TermsOfService from './pages/TermsOfService/TermsOfService.jsx';
+import NotFound from './pages/NotFound/NotFound.jsx';
 
 /* Reset scroll position whenever the route changes. */
 function ScrollToTop() {

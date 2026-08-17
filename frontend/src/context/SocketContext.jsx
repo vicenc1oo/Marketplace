@@ -1,6 +1,6 @@
 import { createContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { getToken, USE_MOCKS } from '../../../../Marketplace/frontend/src/services/api.js';
+import { getToken, USE_MOCKS } from '../services/api.js';
 
 // Owns the single socket.io connection for chat, bidding and notifications.
 // In mock mode it stays disconnected but still exposes subscribe()/emit().

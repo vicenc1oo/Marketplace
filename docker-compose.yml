@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16
-    container_name: transcendence-postgres
+    container_name: marketplace-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME}
@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - transcendence
+      - marketplace
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
       interval: 5s
@@ -24,18 +24,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      environment:
-        PORT: 3000
-        DB_HOST: postgres
-        DB_PORT: 5432
-        DB_NAME: ${DB_NAME}
-        DB_USER: ${DB_USER}
-        DB_PASSWORD: ${DB_PASSWORD}
-      volumes:
-        - backend_data:/app/data
-        - backend_uploads:/app/uploads
-    expose:
-      - "3000"
+    env_file:
+      - .env
+    environment:
+      BACKEND_PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - backend_data:/app/data
+      - backend_uploads:/app/uploads
+    ports:
+      - "3000:3000"
     networks:
       - marketplace
     restart: unless-stopped

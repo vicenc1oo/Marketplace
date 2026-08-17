@@ -1,20 +1,28 @@
 .idea/
+
 # Dependencies
 node_modules/
+
 # Environment files
 .env
-backend/.env
-../Marketplace/frontend/.env
+**/.env
+!.env.example
+!**/.env.example
+
 # Frontend build
-../Marketplace/frontend/dist/
-# SQLite database
-../Marketplace/backend/data/*
-!../Marketplace/backend/data/.gitkeep
+frontend/dist/
+frontend/certs/*.crt
+frontend/certs/*.key
+
+# Backend runtime data
+backend/data/*
+!backend/data/.gitkeep
+
 # Uploaded files
-../Marketplace/backend/uploads/*
-!../Marketplace/backend/uploads/avatars/
-!../Marketplace/backend/uploads/listings/
-!../Marketplace/backend/uploads/avatars/.gitkeep
-!../Marketplace/backend/uploads/listings/.gitkeep
+backend/uploads/*
+!backend/uploads/avatars/
+!backend/uploads/listings/
+!backend/uploads/avatars/.gitkeep
+!backend/uploads/listings/.gitkeep
 
 *:Zone.Identifier

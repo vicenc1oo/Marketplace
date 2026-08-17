@@ -1,5 +1,5 @@
 import { createContext, useCallback, useState } from 'react';
-import Toast from '../../../../Marketplace/frontend/src/components/Toast/Toast.jsx';
+import Toast from '../components/Toast/Toast.jsx';
 
 // App-wide toast notifications for transient feedback via the useToast hook.
 export const ToastContext = createContext(null);
