@@ -9,6 +9,9 @@ const authRoutes = require('./features/auth/auth.routes');
 
 const app = express();
 
+// Do not disclose the framework name/version through the X-Powered-By header.
+app.disable('x-powered-by');
+
 app.use(cors({
     origin: env.corsOrigin === '*' ? true : env.corsOrigin,
     credentials: true,
