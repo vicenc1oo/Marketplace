@@ -8,40 +8,43 @@ const usersByEmail = new Map();
 
 let seedPromise = null;
 
- /* Production users */
-const DEFAULT_PASSWORD = 'User1234';
-const seedUsers = [
-    {
-        id: 'u1',
-        name: 'You',
-        username: 'you',
-        email: 'you@example.com',
-        avatarUrl: null,
-        bio: 'Clearing out the apartment. Quick replies, easy pickup near the centre.',
-        location: 'Lisbon',
-        rating: 4.8,
-        reviewsCount: 23,
-        online: true,
-        memberSince: '2024-02-10',
-    },
-    {
-        id: 'u2',
-        name: 'Marta Silva',
-        username: 'marta',
-        email: 'marta@example.com',
-        avatarUrl: null,
-        bio: 'Selling things I no longer use. All items from a smoke-free home.',
-        location: 'Porto',
-        rating: 4.9,
-        reviewsCount: 51,
-        online: false,
-        memberSince: '2023-06-01',
-    },
-];
 
 function clone(value) {
     return structuredClone(value);
 }
+
+function toUser(row) {
+    if (!row) return null;
+
+    return {
+        id: row.id,
+        name: row.name,
+        username: row.username,
+        email: row.email,
+        avatarUrl: row.avatar_url,
+        bio: row.bio,
+        location: row.location,
+        rating: Number(row.rating),
+        reviewsCount: row.reviews_count,
+        online: row.online,
+        memberSince: row.member_since instanceof Date
+            ? row.member_since.toISOString().slice(0, 10)
+            : row.member_since,
+        passwordHash: row.password_hash,
+        resetToken: row.reset_token,
+        resetTokenExpiresAt: row.reset_token_expires_at,
+    };
+}
+
+async function findUserByEmail(email) {
+    const result = await query(
+        'SELECT * FROM users WHERE email = $1',
+        [normalizeEmail(email)],
+    );
+
+    return toUser(result.rows[0]);
+}
+
 
 function normalizeEmail(email) {
     return String(email || '').trim().toLowerCase();
@@ -95,34 +98,15 @@ function makeUsername(name, email) {
     return base || `user_${crypto.randomBytes(4).toString('hex')}`;
 }
 
-function saveUser(user) {
-    usersById.set(user.id, user);
-    usersByEmail.set(normalizeEmail(user.email), user);
-    return user;
-}
-
-async function ensureSeedUsers() {
-    if (!seedPromise) {
-        seedPromise = Promise.all(
-            seedUsers.map(async (seedUser) => {
-                const passwordHash = await hashPassword(DEFAULT_PASSWORD);
-                saveUser({ ...seedUser, email: normalizeEmail(seedUser.email), passwordHash });
-            }),
-        );
-    }
-
-    await seedPromise;
-}
 
 async function login({ email, password }) {
-    await ensureSeedUsers();
-
     const normalizedEmail = normalizeEmail(email);
+
     if (!normalizedEmail || !password) {
         throw createHttpError(400, 'Email and password are required.');
     }
 
-    const user = usersByEmail.get(normalizedEmail);
+    const user = await findUserByEmail(normalizedEmail);
     const passwordMatches = user ? await verifyPassword(password, user.passwordHash) : false;
 
     if (!user || !passwordMatches) {
@@ -136,8 +120,6 @@ async function login({ email, password }) {
 }
 
 async function register({ name, email, password }) {
-    await ensureSeedUsers();
-
     const trimmedName = String(name || '').trim();
     const normalizedEmail = normalizeEmail(email);
 
@@ -148,25 +130,45 @@ async function register({ name, email, password }) {
     assertEmail(normalizedEmail);
     assertStrongPassword(password);
 
-    if (usersByEmail.has(normalizedEmail)) {
+    const existingUser = await findUserByEmail(normalizedEmail);
+    if (existingUser) {
         throw createHttpError(409, 'An account with this email already exists.');
     }
 
-    const now = new Date();
-    const user = saveUser({
-        id: makeUserId(),
-        name: trimmedName,
-        username: makeUsername(trimmedName, normalizedEmail),
-        email: normalizedEmail,
-        avatarUrl: null,
-        bio: '',
-        location: '',
-        rating: 0,
-        reviewsCount: 0,
-        online: true,
-        memberSince: now.toISOString().slice(0, 10),
-        passwordHash: await hashPassword(password),
-    });
+    const id = makeUserId();
+    const username = makeUsername(trimmedName, normalizedEmail);
+    const passwordHash = await hashPassword(password);
+
+    const result = await query(
+        `
+    INSERT INTO users (
+      id,
+      name,
+      username,
+      email,
+      password_hash,
+      avatar_url,
+      bio,
+      location,
+      rating,
+      reviews_count,
+      online,
+      member_since
+    ) VALUES (
+      $1, $2, $3, $4, $5, NULL, '', '', 0, 0, true, CURRENT_DATE
+    )
+    RETURNING *
+    `,
+        [
+            id,
+            trimmedName,
+            username,
+            normalizedEmail,
+            passwordHash,
+        ],
+    );
+
+    const user = toUser(result.rows[0]);
 
     return {
         token: createTokenForUser(user),
@@ -175,46 +177,92 @@ async function register({ name, email, password }) {
 }
 
 async function findUserById(userId) {
-    await ensureSeedUsers();
+    const result = await query(
+        'SELECT * FROM users WHERE id = $1', [userId],
+    );
 
-    const user = usersById.get(userId);
+    const user = toUser(result.rows[0]);
     return user ? toPublicUser(user) : null;
 }
 
+async function listUsers() {
+    const result = await query(
+        'SELECT * FROM users ORDER BY name ASC',
+    );
+
+    return result.rows.map((row) => toPublicUser(toUser(row)));
+}
+
 async function forgotPassword(email) {
-    await ensureSeedUsers();
-
     const normalizedEmail = normalizeEmail(email);
-    const user = usersByEmail.get(normalizedEmail);
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-    if (user) {
-        user.resetToken = crypto.randomBytes(32).toString('hex');
-        user.resetTokenExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-    }
+    await query(
+        `
+    UPDATE users
+    SET reset_token = $1,
+        reset_token_expires_at = $2,
+        updated_at = NOW()
+    WHERE email = $3
+    `,
+        [resetToken, resetTokenExpiresAt, normalizedEmail],
+    );
 
     return { ok: true };
 }
 
-async function listUsers() {
-    await ensureSeedUsers();
-    return Array.from(usersById.values()).map(toPublicUser);
-}
+
 
 async function updateUserProfile(userId, patch) {
-    await ensureSeedUsers();
-    const user = usersById.get(userId);
-    if (!user) return null;
+    const fields = [];
+    const values = [];
+    let index = 1;
 
-    Object.assign(user, patch);
-    return toPublicUser(user);
+    const columnByField = {
+        name: 'name',
+        bio: 'bio',
+        location: 'location',
+        avatarUrl: 'avatar_url',
+    };
+
+    Object.entries(patch).forEach(([field, value]) => {
+        const column = columnByField[field];
+        if (!column) return;
+
+        fields.push(`${column} = $${index}`);
+        values.push(value);
+        index += 1;
+    });
+
+    if (!fields.length) {
+        return findUserById(userId);
+    }
+
+    values.push(userId);
+
+    const result = await query(
+        `
+    UPDATE users
+    SET ${fields.join(', ')},
+      updated_at = NOW()
+    WHERE id = $${index}
+    RETURNING *
+    `,
+        values,
+    );
+
+    const user = toUser(result.rows[0]);
+    return user ? toPublicUser(user) : null;
 }
 
+
+
 module.exports = {
-    DEFAULT_PASSWORD,
     login,
     register,
     findUserById,
-    forgotPassword,
     listUsers,
+    forgotPassword,
     updateUserProfile,
 };

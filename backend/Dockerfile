@@ -17,5 +17,5 @@ COPY . .
 # Document the port used by the Express server inside the container.
 EXPOSE 3000
 
-# Start the backend using the package.json "start" script.
-CMD ["npm", "start"]
+# Apply idempotent schema migrations before accepting API requests.
+CMD ["sh", "-c", "npm run db:migrate && npm start"]

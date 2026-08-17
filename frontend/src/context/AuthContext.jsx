@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useState } from 'react';
-import * as authService from '../../../../Marketplace/frontend/src/services/auth.service.js';
-import { getToken } from '../../../../Marketplace/frontend/src/services/api.js';
+import * as authService from '../services/auth.service.js';
+import { getToken } from '../services/api.js';
 
 // Holds the signed-in user and auth actions; restores the session from a saved token.
 export const AuthContext = createContext(null);

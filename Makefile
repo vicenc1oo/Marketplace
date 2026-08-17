@@ -4,7 +4,7 @@ CERT_DIR = frontend/certs
 CERT_KEY = $(CERT_DIR)/localhost.key
 CERT_CRT = $(CERT_DIR)/localhost.crt
 
-.PHONY: all certs build up down logs restart clean fclean re
+.PHONY: all certs build up down logs restart clean fclean re db-migrate db-seed db-setup
 
 all: up
 
@@ -43,15 +43,14 @@ fclean:
 re: fclean up
 
 db-migrate:
- 	$(COMPOSE) exec backend npm run db:migrate
+	$(COMPOSE) exec backend npm run db:migrate
 
 db-seed:
- 	$(COMPOSE) exec backend npm run db:seed:users
- 	$(COMPOSE) exec backend npm run db:seed:categories
- 	$(COMPOSE) exec backend npm run db:seed:wallets
- 	$(COMPOSE) exec backend npm run db:seed:promotion-packages
- 	$(COMPOSE) exec backend npm run db:seed:listings
+	$(COMPOSE) exec backend npm run db:seed:users
+	$(COMPOSE) exec backend npm run db:seed:categories
+	$(COMPOSE) exec backend npm run db:seed:wallets
+	$(COMPOSE) exec backend npm run db:seed:promotion-packages
+	$(COMPOSE) exec backend npm run db:seed:listings
+	$(COMPOSE) exec backend npm run db:seed:reviews
 
 db-setup: db-migrate db-seed
-
-.PHONY: all certs build up down logs restart clean fclean re db-migrate db-seed db-setup

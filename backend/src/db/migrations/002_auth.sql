@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS user_two_factor (
+	user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+	secret TEXT,
+	enabled BOOLEAN NOT NULL DEFAULT false,
+	verified_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

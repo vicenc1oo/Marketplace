@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import * as currencyService from '../../../../Marketplace/frontend/src/services/currency.service.js';
+import * as currencyService from '../services/currency.service.js';
 import { AuthContext } from './AuthContext.jsx';
 
 // Exposes the user's virtual-credit wallet and a refresh() to keep the balance in sync.

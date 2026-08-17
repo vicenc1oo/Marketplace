@@ -2,8 +2,10 @@
 node_modules/
 dist/
 
-# Local env (keep .env.example committed)
+# Local env (.env.example committed)
 .env
+backend/.env
+frontend/.env
 
 # Tooling / session artifacts — never commit
 .playwright-mcp/

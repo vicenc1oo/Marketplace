@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS users (
+	id TEXT PRIMARY KEY,
+	name VARCHAR(80) NOT NULL,
+	username VARCHAR(24) NOT NULL UNIQUE,
+	email VARCHAR(255) NOT NULL UNIQUE,
+	password_hash TEXT NOT NULL,
+	avatar_url VARCHAR(500),
+	bio VARCHAR(200) NOT NULL DEFAULT '',
+	location VARCHAR(80) NOT NULL DEFAULT '',
+	rating NUMERIC(2, 1) NOT NULL DEFAULT 0,
+	reviews_count INTEGER NOT NULL DEFAULT 0,
+	online BOOLEAN NOT NULL DEFAULT false,
+	member_since DATE NOT NULL DEFAULT CURRENT_DATE,
+	reset_token TEXT,
+	reset_token_expires_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
