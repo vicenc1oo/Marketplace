@@ -36,8 +36,8 @@ services:
     volumes:
       - backend_data:/app/data
       - backend_uploads:/app/uploads
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     networks:
       - marketplace
     restart: unless-stopped

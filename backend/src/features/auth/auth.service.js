@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { createHttpError } = require('../../utils/response.utils');
 const { hashPassword, verifyPassword } = require('../../utils/hash.utils');
 const { signToken } = require('../../utils/jwt.utils');
+const { query } = require('../../config/db');
 
 const usersById = new Map();
 const usersByEmail = new Map();
