@@ -52,7 +52,6 @@ export default function App() {
                                         <Route path="/marketplace" element={<Marketplace />} />
                                         <Route path="/marketplace/:id" element={<ListingDetails />} />
                                         <Route path="/bidding" element={<Bidding />} />
-                                        <Route path="/profile/:userId" element={<Profile />} />
                                         <Route path="/login" element={<Login />} />
                                         <Route path="/register" element={<Register />} />
                                         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -68,6 +67,7 @@ export default function App() {
                                             <Route path="/dashboard" element={<Dashboard />} />
                                             <Route path="/wallet" element={<Wallet />} />
                                             <Route path="/promotions" element={<Promotions />} />
+                                            <Route path="/profile/:userId" element={<Profile />} />
                                         </Route>
 
                                         <Route path="*" element={<NotFound />} />
