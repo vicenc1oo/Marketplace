@@ -1,14 +1,16 @@
-import express from 'express';
+const app = require('./app');
+const { env } = require('./config/env');
 
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.use(express.json());
-
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
+const server = app.listen(env.port, () => {
+  // eslint-disable-next-line no-console
+  console.log(`API listening on http://localhost:${env.port}${env.apiPrefix}`);
 });
 
-app.listen(port, () => {
-    console.log(`Backend listening on port ${port}`);
-});
+function shutdown(signal) {
+  // eslint-disable-next-line no-console
+  console.log(`${signal} received, shutting down API.`);
+  server.close(() => process.exit(0));
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

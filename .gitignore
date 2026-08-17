@@ -16,3 +16,5 @@ backend/.env
 !../Marketplace/backend/uploads/listings/
 !../Marketplace/backend/uploads/avatars/.gitkeep
 !../Marketplace/backend/uploads/listings/.gitkeep
+
+*:Zone.Identifier
