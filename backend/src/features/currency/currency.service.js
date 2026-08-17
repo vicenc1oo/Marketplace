@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { createHttpError } = require('../../utils/response.utils');
 
 const DEFAULT_USER_ID = 'u1';
@@ -7,7 +8,7 @@ function daysAgo(days) {
 }
 
 function clone(value) {
-    return JSON.parse(JSON.stringify(value));
+    return structuredClone(value);
 }
 
 const wallets = new Map([
@@ -65,7 +66,7 @@ function normalizeAmount(amount) {
 
 function makeTransaction(type, amount, description) {
     return {
-        id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        id: `t_${crypto.randomUUID()}`,
         type,
         amount,
         description,
