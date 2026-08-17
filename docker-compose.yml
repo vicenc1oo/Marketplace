@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketplace-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: 3000
+      DATABASE_PATH: /app/data/database.sqlite
+    volumes:
+      - backend_data:/app/data
+      - backend_uploads:/app/uploads
+    expose:
+      - "3000"
+    networks:
+      - marketplace
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: /
+        VITE_USE_MOCKS: "false"
+    container_name: marketplace-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./frontend/certs:/etc/nginx/certs:ro
+    networks:
+      - marketplace
+    restart: unless-stopped
+
+networks:
+  marketplace:
+    driver: bridge
+
+volumes:
+  backend_data:
+  backend_uploads:
