@@ -1,9 +1,11 @@
 const app = require('./app');
 const { env } = require('./config/env');
 const { testDatabaseConnection } = require('./config/db');
+const { seedCategoriesTable } = require('./db/seeds/categories.seed');
 
 async function startServer() {
   await testDatabaseConnection();
+  await seedCategoriesTable();
 
   const server = app.listen(env.port, () => {
     // eslint-disable-next-line no-console

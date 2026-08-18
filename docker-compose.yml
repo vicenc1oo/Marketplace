@@ -49,7 +49,7 @@ services:
       args:
         VITE_API_URL: /api
         VITE_WS_URL: /
-        VITE_USE_MOCKS: "true"
+        VITE_USE_MOCKS: "false"
     container_name: marketplace-frontend
     depends_on:
       - backend

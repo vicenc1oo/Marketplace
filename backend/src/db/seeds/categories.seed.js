@@ -30,9 +30,15 @@ async function seedCategoriesTable() {
     console.log('Categories seed completed.');
 }
 
-seedCategoriesTable()
-    .catch((error) => {
-        console.error('Categories seed failed:', error);
-        process.exitCode = 1;
-    })
-    .finally(() => pool.end());
+// Export for use in server initialization
+module.exports = { seedCategoriesTable, categories };
+
+// Allow this file to be run directly as a script
+if (require.main === module) {
+    seedCategoriesTable()
+        .catch((error) => {
+            console.error('Categories seed failed:', error);
+            process.exitCode = 1;
+        })
+        .finally(() => pool.end());
+}

@@ -38,7 +38,7 @@ app.use(`${env.apiPrefix}/listings`, listingRouter);
 app.use(`${env.apiPrefix}/categories`, categoryRouter);
 
 
-app.use(`${env.apiPrefix}/uploads`, uploadRoutes);
+app.use(`${env.apiPrefix}/upload`, uploadRoutes);
 
 // Uploaded images are accessible for users and non-users
 app.use(`${env.apiPrefix}/uploads`, express.static(uploadService.UPLOAD_ROOT, {
