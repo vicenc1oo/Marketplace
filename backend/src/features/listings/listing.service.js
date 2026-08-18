@@ -105,40 +105,28 @@ async function listListings(query = {}) {
     const sort = String(query.sort || 'recent');
     if (!SORTS.has(sort)) throw createHttpError(400, 'Sort option is invalid.');
 
-    let items = listingModel.listAll().filter((listing) => listing.status === 'active');
-    if (query.category) items = items.filter((item) => item.category === query.category);
-    if (query.location) items = items.filter((item) => item.location.toLowerCase() === String(query.location).trim().toLowerCase());
-    if (query.condition) items = items.filter((item) => item.condition === query.condition);
-    if (query.type) items = items.filter((item) => item.type === query.type);
+    const filters = {
+        category: query.category ? String(query.category).trim() : null,
+        location: query.location ? String(query.location).trim() : null,
+        condition: query.condition ? String(query.condition).trim() : null,
+        type: query.type ? String(query.type).trim() : null,
+        q: query.q ? String(query.q).trim() : null,
+    };
 
     if (query.minPrice != null && query.minPrice !== '') {
         const minimum = Number(query.minPrice);
         if (!Number.isFinite(minimum) || minimum < 0) throw createHttpError(400, 'Minimum price is invalid.');
-        items = items.filter((item) => (item.currentBid ?? item.price) >= minimum);
+        filters.minPrice = minimum;
     }
     if (query.maxPrice != null && query.maxPrice !== '') {
         const maximum = Number(query.maxPrice);
         if (!Number.isFinite(maximum) || maximum < 0) throw createHttpError(400, 'Maximum price is invalid.');
-        items = items.filter((item) => (item.currentBid ?? item.price) <= maximum);
-    }
-    if (query.q) {
-        const needle = String(query.q).trim().toLowerCase();
-        items = items.filter((item) => item.title.toLowerCase().includes(needle) || item.description.toLowerCase().includes(needle));
+        filters.maxPrice = maximum;
     }
 
-    items.sort((a, b) => {
-        const firstPrice = a.currentBid ?? a.price;
-        const secondPrice = b.currentBid ?? b.price;
-        if (sort === 'price_asc') return firstPrice - secondPrice;
-        if (sort === 'price_desc') return secondPrice - firstPrice;
-        if (sort === 'popular') return b.favoritesCount - a.favoritesCount;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-
-    const total = items.length;
-    const paged = items.slice((page - 1) * limit, page * limit);
+    const { items, total } = await listingModel.list({ filters, page, limit, sort });
     return {
-        items: await attachSellers(paged),
+        items: await attachSellers(items),
         total,
         page,
         totalPages: Math.max(1, Math.ceil(total / limit)),
@@ -146,32 +134,32 @@ async function listListings(query = {}) {
 }
 
 async function getListing(id) {
-    const listing = listingModel.incrementViews(String(id));
+    const listing = await listingModel.incrementViews(String(id));
     if (!listing) throw createHttpError(404, 'Listing not found.');
     return attachSeller(listing);
 }
 
 async function getFeatured() {
-    const items = listingModel.listAll().filter((item) => item.status === 'active')
-        .sort((a, b) => b.favoritesCount - a.favoritesCount).slice(0, 4);
+    const items = await listingModel.listBy({
+        status: 'active', limit: 4, orderBy: 'l.favorites_count DESC',
+    });
     return attachSellers(items);
 }
 
 async function getRecent() {
-    const items = listingModel.listAll().filter((item) => item.status === 'active')
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
+    const items = await listingModel.listBy({ status: 'active', limit: 8 });
     return attachSellers(items);
 }
 
 async function createListing(userId, payload) {
-    const data = validatePayload(payload);
-    return attachSeller(listingModel.insert({
+    const data = await validatePayload(payload);
+    return attachSeller(await listingModel.insert({
         ...data, sellerId: userId, status: 'active', currency: 'EUR', favoritesCount: 0, viewsCount: 0,
     }));
 }
 
 async function requireOwnedListing(userId, id) {
-    const listing = listingModel.findById(String(id));
+    const listing = await listingModel.findById(String(id));
     if (!listing) throw createHttpError(404, 'Listing not found.');
     if (listing.sellerId !== userId) throw createHttpError(403, 'You can only modify your own listings.');
     return listing;
@@ -179,29 +167,28 @@ async function requireOwnedListing(userId, id) {
 
 async function updateListing(userId, id, payload) {
     const existing = await requireOwnedListing(userId, id);
-    const data = validatePayload(payload, existing);
-    return attachSeller(listingModel.update(existing.id, data));
+    const data = await validatePayload(payload, existing);
+    return attachSeller(await listingModel.update(existing.id, data));
 }
 
 async function deleteListing(userId, id) {
     const existing = await requireOwnedListing(userId, id);
-    listingModel.remove(existing.id);
+    await listingModel.remove(existing.id);
     return { ok: true };
 }
 
 async function toggleFavorite(userId, id) {
-    const result = listingModel.toggleFavorite(userId, String(id));
+    const result = await listingModel.toggleFavorite(userId, String(id));
     if (!result) throw createHttpError(404, 'Listing not found.');
     return result;
 }
 
 async function getFavorites(userId) {
-    return attachSellers(listingModel.listFavorites(userId));
+    return attachSellers(await listingModel.listBy({ favoriteUserId: userId }));
 }
 
 async function getListingsBySeller(sellerId) {
-    const items = listingModel.listAll().filter((item) => item.sellerId === sellerId)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const items = await listingModel.listBy({ sellerId });
     return attachSellers(items);
 }
 

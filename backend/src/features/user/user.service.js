@@ -23,6 +23,7 @@ async function assertUserExists(userId) {
     if (!user) {
         throw createHttpError(404, 'User not found.');
     }
+
     return user;
 }
 
@@ -68,6 +69,7 @@ function sanitizeProfilePatch(payload = {}) {
         }
         patch.avatarUrl = avatarUrl || null;
     }
+
     return patch;
 }
 
@@ -82,18 +84,18 @@ async function updateMe(userId, payload) {
     if (!Object.keys(patch).length) {
         return authService.findUserById(userId);
     }
+
     return authService.updateUserProfile(userId, patch);
 }
 
 async function getUserListings(userId) {
     const user = await assertUserExists(userId);
-    return userModel.findListingsBySeller(user.id, authService.findUserById);
+    return userModel.findListingsBySeller(user.id);
 }
 
 async function getReviews(userId) {
     const user = await assertUserExists(userId);
-    const users = await authService.listUsers();
-    return userModel.buildReviewsForUser(user.id, users);
+    return userModel.findReviewsForUser(user.id);
 }
 
 module.exports = {

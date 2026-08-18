@@ -1,76 +1,44 @@
-const DEFAULT_USER_ID = 'u1';
+const { query } = require('../../config/db');
 
-const analyticsStore = {
-    listings: [
-        { id: 'l11', sellerId: 'u1', status: 'active', viewsCount: 190 },
-        { id: 'l12', sellerId: 'u1', status: 'active', viewsCount: 175 },
-        { id: 'l13', sellerId: 'u1', status: 'sold', viewsCount: 120 },
-        { id: 'l1', sellerId: 'u2', status: 'active', viewsCount: 210 },
-        { id: 'l2', sellerId: 'u3', status: 'active', viewsCount: 540 },
-    ],
-    bids: [
-        { id: 'b1', listingId: 'l4', bidderId: 'u1' },
-        { id: 'b2', listingId: 'l4', bidderId: 'u2' },
-        { id: 'b3', listingId: 'l4', bidderId: 'u1' },
-        { id: 'b4', listingId: 'l8', bidderId: 'u1' },
-        { id: 'b5', listingId: 'l8', bidderId: 'u2' },
-    ],
-    conversations: [
-        {
-            id: 'c1',
-            participantIds: ['u1', 'u2'],
-            messages: [
-                { id: 'm1', senderId: 'u1', read: true },
-                { id: 'm2', senderId: 'u2', read: true },
-                { id: 'm3', senderId: 'u1', read: false },
-            ],
-        },
-        {
-            id: 'c2',
-            participantIds: ['u1', 'u3'],
-            messages: [
-                { id: 'm4', senderId: 'u3', read: true },
-                { id: 'm5', senderId: 'u1', read: true },
-                { id: 'm6', senderId: 'u3', read: true },
-            ],
-        },
-    ],
-    savedListingIdsByUser: new Map([
-        [DEFAULT_USER_ID, new Set()],
-    ]),
-};
-
-function countUnreadMessages(conversations, userId) {
-    return conversations.reduce((total, conversation) => {
-        if (!conversation.participantIds.includes(userId)) return total;
-
-        const unreadInConversation = conversation.messages.filter(
-            (message) => message.senderId !== userId && !message.read,
-        ).length;
-
-        return total + unreadInConversation;
-    }, 0);
-}
-
-function sumViews(listings) {
-    return listings.reduce((total, listing) => total + Number(listing.viewsCount || 0), 0);
-}
-
-async function getDashboardStats(userId = DEFAULT_USER_ID) {
-    const userListings = analyticsStore.listings.filter((listing) => listing.sellerId === userId);
-    const savedListingIds = analyticsStore.savedListingIdsByUser.get(userId) || new Set();
-
+async function getDashboardStats(userId) {
+    const result = await query(
+        `SELECT
+       (SELECT COUNT(*)::int
+        FROM listings
+        WHERE seller_id = $1 AND status = 'active') AS active_listings,
+       (SELECT COUNT(*)::int
+        FROM listings
+        WHERE seller_id = $1 AND status = 'sold') AS sold_items,
+       (SELECT COUNT(DISTINCT b.listing_id)::int
+        FROM bids b
+        JOIN listings l ON l.id = b.listing_id
+        WHERE b.bidder_id = $1
+          AND l.status = 'active'
+          AND (l.ends_at IS NULL OR l.ends_at > NOW())) AS active_bids,
+       (SELECT COUNT(*)::int
+        FROM messages m
+        JOIN conversation_participants cp
+          ON cp.conversation_id = m.conversation_id
+        WHERE cp.user_id = $1
+          AND m.sender_id <> $1
+          AND m.read = false) AS unread_messages,
+       (SELECT COUNT(*)::int
+        FROM listing_favorites
+        WHERE user_id = $1) AS saved_listings,
+       (SELECT COALESCE(SUM(views_count), 0)::int
+        FROM listings
+        WHERE seller_id = $1) AS total_views`,
+        [userId],
+    );
+    const row = result.rows[0];
     return {
-        activeListings: userListings.filter((listing) => listing.status === 'active').length,
-        soldItems: userListings.filter((listing) => listing.status === 'sold').length,
-        activeBids: analyticsStore.bids.filter((bid) => bid.bidderId === userId).length,
-        unreadMessages: countUnreadMessages(analyticsStore.conversations, userId),
-        savedListings: savedListingIds.size,
-        totalViews: sumViews(userListings),
+        activeListings: row.active_listings,
+        soldItems: row.sold_items,
+        activeBids: row.active_bids,
+        unreadMessages: row.unread_messages,
+        savedListings: row.saved_listings,
+        totalViews: row.total_views,
     };
 }
 
-module.exports = {
-    DEFAULT_USER_ID,
-    getDashboardStats,
-};
+module.exports = { getDashboardStats };

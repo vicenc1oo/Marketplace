@@ -1,116 +1,117 @@
 const crypto = require('crypto');
+const { pool, query } = require('../../config/db');
 const { createHttpError } = require('../../utils/response.utils');
 
-const DEFAULT_USER_ID = 'u1';
-
-function daysAgo(days) {
-    return new Date(Date.now() - days * 86400000).toISOString();
-}
-
-function clone(value) {
-    return structuredClone(value);
-}
-
-const wallets = new Map([
-    [
-        DEFAULT_USER_ID,
-        {
-            balance: 320,
-            transactions: [
-                {
-                    id: 't3',
-                    type: 'debit',
-                    amount: 60,
-                    description: 'Spotlight "4K monitor"',
-                    createdAt: daysAgo(2),
-                },
-                {
-                    id: 't2',
-                    type: 'debit',
-                    amount: 120,
-                    description: 'Boosted "Standing desk"',
-                    createdAt: daysAgo(5),
-                },
-                {
-                    id: 't1',
-                    type: 'credit',
-                    amount: 500,
-                    description: 'Welcome bonus',
-                    createdAt: daysAgo(40),
-                },
-            ],
-        },
-    ],
-]);
-
-function ensureWallet(userId = DEFAULT_USER_ID) {
-    if (!wallets.has(userId)) {
-        wallets.set(userId, {
-            balance: 0,
-            transactions: [],
-        });
-    }
-
-    return wallets.get(userId);
+function makeTransactionId() {
+    return typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `transaction_${crypto.randomBytes(12).toString('hex')}`;
 }
 
 function normalizeAmount(amount) {
     const numericAmount = Number(amount);
-
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
         throw createHttpError(400, 'Amount must be a positive number.');
     }
-
     return numericAmount;
 }
 
-function makeTransaction(type, amount, description) {
+function toTransaction(row) {
     return {
-        id: `t_${crypto.randomUUID()}`,
-        type,
-        amount,
-        description,
-        createdAt: new Date().toISOString(),
+        id: row.id,
+        type: row.type,
+        amount: Number(row.amount),
+        description: row.description,
+        listingId: row.listing_id,
+        promotionId: row.promotion_id,
+        createdAt: row.created_at,
     };
 }
 
-async function getWallet(userId = DEFAULT_USER_ID) {
-    const wallet = ensureWallet(userId);
-
-    return clone({
-        balance: wallet.balance,
-        transactions: wallet.transactions,
-    });
+async function ensureWallet(userId, client = { query }) {
+    await client.query(
+        `INSERT INTO wallets (user_id, balance)
+     VALUES ($1, 0)
+     ON CONFLICT (user_id) DO NOTHING`,
+        [userId],
+    );
 }
 
-async function creditWallet(userId, amount, description = 'Credit added') {
-    const wallet = ensureWallet(userId);
-    const numericAmount = normalizeAmount(amount);
-    const transaction = makeTransaction('credit', numericAmount, description);
+async function getWallet(userId) {
+    await ensureWallet(userId);
+    const [walletResult, transactionsResult] = await Promise.all([
+        query('SELECT balance FROM wallets WHERE user_id = $1', [userId]),
+        query(
+            `SELECT id, type, amount, description, listing_id, promotion_id, created_at
+       FROM wallet_transactions
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+            [userId],
+        ),
+    ]);
 
-    wallet.balance += numericAmount;
-    wallet.transactions.unshift(transaction);
-
-    return getWallet(userId);
+    return {
+        balance: Number(walletResult.rows[0].balance),
+        transactions: transactionsResult.rows.map(toTransaction),
+    };
 }
 
-async function debitWallet(userId, amount, description = 'Credit spent') {
-    const wallet = ensureWallet(userId);
+async function changeBalance(userId, type, amount, description, references = {}) {
     const numericAmount = normalizeAmount(amount);
-
-    if (wallet.balance < numericAmount) {
-        throw createHttpError(400, 'Not enough credits.');
+    const normalizedDescription = String(description || '').trim();
+    if (!normalizedDescription) {
+        throw createHttpError(400, 'Transaction description is required.');
     }
 
-    const transaction = makeTransaction('debit', numericAmount, description);
-    wallet.balance -= numericAmount;
-    wallet.transactions.unshift(transaction);
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await ensureWallet(userId, client);
+        const walletResult = await client.query(
+            'SELECT balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+            [userId],
+        );
+        const currentBalance = Number(walletResult.rows[0].balance);
+        if (type === 'debit' && currentBalance < numericAmount) {
+            throw createHttpError(400, 'Not enough credits.');
+        }
+
+        const nextBalance = type === 'credit'
+            ? currentBalance + numericAmount
+            : currentBalance - numericAmount;
+        await client.query(
+            'UPDATE wallets SET balance = $2, updated_at = NOW() WHERE user_id = $1',
+            [userId, nextBalance],
+        );
+        await client.query(
+            `INSERT INTO wallet_transactions (
+         id, user_id, type, amount, description, listing_id, promotion_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+                makeTransactionId(), userId, type, numericAmount, normalizedDescription,
+                references.listingId || null, references.promotionId || null,
+            ],
+        );
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
 
     return getWallet(userId);
+}
+
+async function creditWallet(userId, amount, description = 'Credit added', references) {
+    return changeBalance(userId, 'credit', amount, description, references);
+}
+
+async function debitWallet(userId, amount, description = 'Credit spent', references) {
+    return changeBalance(userId, 'debit', amount, description, references);
 }
 
 module.exports = {
-    DEFAULT_USER_ID,
     getWallet,
     creditWallet,
     debitWallet,
