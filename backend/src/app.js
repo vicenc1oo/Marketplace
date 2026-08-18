@@ -7,6 +7,10 @@ const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const { optionalAuth } = require('./middleware/auth.middleware');
 const authRoutes = require('./features/auth/auth.routes');
 const userRoutes = require('./features/user/user.routes');
+const notificationRoutes = require('./features/notifications/notification.routes');
+const { listingRouter, categoryRouter } = require('./features/listings/listing.routes')
+const uploadRoutes = require('./features/upload/upload.routes');
+const uploadService = require('./features/upload/upload.service');
 
 const app = express();
 
@@ -29,6 +33,20 @@ app.use(optionalAuth);
 app.use(`${env.apiPrefix}/currency`, currencyRoutes);
 app.use(`${env.apiPrefix}/analytics`, analyticsRoutes);
 app.use(`${env.apiPrefix}/users`, userRoutes);
+app.use(`${env.apiPrefix}/notifications`, notificationRoutes);
+app.use(`${env.apiPrefix}/listings`, listingRouter);
+app.use(`${env.apiPrefix}/categories`, categoryRouter);
+
+
+app.use(`${env.apiPrefix}/uploads`, uploadRoutes);
+
+// Uploaded images are accessible for users and non-users
+app.use(`${env.apiPrefix}/uploads`, express.static(uploadService.UPLOAD_ROOT, {
+    dotfiles: 'deny',
+    index: false,
+    maxAge: '1d',
+}));
+
 
 app.use(notFoundHandler);
 app.use(errorHandler);
