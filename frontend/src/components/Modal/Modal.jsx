@@ -7,6 +7,10 @@ import './Modal.css';
 export default function Modal({ open, onClose, title, children, footer, size = 'md' }) {
   const dialogRef = useRef(null);
   const lastFocused = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  // Keep the latest callback without restarting the focus effect on every render.
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -14,7 +18,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
     document.body.style.overflow = 'hidden';
 
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape') onCloseRef.current?.();
     };
     document.addEventListener('keydown', onKey);
     // Focus the dialog container once mounted.
@@ -25,32 +29,32 @@ export default function Modal({ open, onClose, title, children, footer, size = '
       document.body.style.overflow = '';
       lastFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   const titleId = title ? 'modal-title' : undefined;
 
   return createPortal(
-    <div className="modal__backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div
-        className={`modal modal--${size}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        ref={dialogRef}
-        tabIndex={-1}
-      >
-        <div className="modal__header">
-          {title && <h2 className="modal__title" id={titleId}>{title}</h2>}
-          <button type="button" className="modal__close" onClick={onClose} aria-label="Close dialog">
-            <Icon name="close" />
-          </button>
+      <div className="modal__backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
+        <div
+            className={`modal modal--${size}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            ref={dialogRef}
+            tabIndex={-1}
+        >
+          <div className="modal__header">
+            {title && <h2 className="modal__title" id={titleId}>{title}</h2>}
+            <button type="button" className="modal__close" onClick={onClose} aria-label="Close dialog">
+              <Icon name="close" />
+            </button>
+          </div>
+          <div className="modal__body">{children}</div>
+          {footer && <div className="modal__footer">{footer}</div>}
         </div>
-        <div className="modal__body">{children}</div>
-        {footer && <div className="modal__footer">{footer}</div>}
-      </div>
-    </div>,
-    document.body,
+      </div>,
+      document.body,
   );
 }

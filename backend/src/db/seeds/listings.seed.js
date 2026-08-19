@@ -16,10 +16,13 @@ const listings = [
         sellerId: 'u2',
         title: 'Road bike',
         description: 'Light road bike, recently serviced.',
-        price: 420,
+        price: 250,
         categoryId: 'bikes',
-        condition: 'very_good',
+        condition: 'good',
         location: 'Porto',
+        type: 'auction',
+        startingBid: 250,
+        endsAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
     },
     {
         id: 'l3',
@@ -37,27 +40,39 @@ async function seedListingsTable() {
     for (const listing of listings) {
         await query(
             `
-			INSERT INTO listings (
-			  id,
-			  seller_id,
-			  title,
-			  description,
-			  price,
-			  category_id,
-			  condition,
-			  location
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			ON CONFLICT (id) DO UPDATE SET
-			  seller_id = EXCLUDED.seller_id,
-			  title = EXCLUDED.title,
-			  description = EXCLUDED.description,
-			  price = EXCLUDED.price,
-			  category_id = EXCLUDED.category_id,
-			  condition = EXCLUDED.condition,
-			  location = EXCLUDED.location,
-			  updated_at = NOW()
-			`,
+                INSERT INTO listings (
+                    id,
+                    seller_id,
+                    title,
+                    description,
+                    price,
+                    category_id,
+                    condition,
+                    location,
+                    type,
+                    starting_bid,
+                    current_bid,
+                    bids_count,
+                    ends_at,
+                    status
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, 0, $11, 'active')
+                    ON CONFLICT (id) DO UPDATE SET
+                    seller_id = EXCLUDED.seller_id,
+                    title = EXCLUDED.title,
+                    description = EXCLUDED.description,
+                    price = EXCLUDED.price,
+                    category_id = EXCLUDED.category_id,
+                    condition = EXCLUDED.condition,
+                    location = EXCLUDED.location,
+                    type = EXCLUDED.type,
+                    starting_bid = EXCLUDED.starting_bid,
+                    current_bid = EXCLUDED.current_bid,
+                    bids_count = EXCLUDED.bids_count,
+                   ends_at = EXCLUDED.ends_at,
+                   status = EXCLUDED.status,
+                   updated_at = NOW()
+            `,
             [
                 listing.id,
                 listing.sellerId,
@@ -67,17 +82,20 @@ async function seedListingsTable() {
                 listing.categoryId,
                 listing.condition,
                 listing.location,
+                listing.type || 'fixed',
+                listing.startingBid || null,
+                listing.endsAt || null,
             ],
         );
 
         await query(
             `
-			INSERT INTO listing_images (id, listing_id, image_url, position)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (id) DO UPDATE SET
-			  image_url = EXCLUDED.image_url,
-			  position = EXCLUDED.position
-			`,
+            INSERT INTO listing_images (id, listing_id, image_url, position)
+            VALUES ($1, $2, $3, $4)
+                ON CONFLICT (id) DO UPDATE SET
+                image_url = EXCLUDED.image_url,
+                position = EXCLUDED.position
+            `,
             [
                 `${listing.id}_image_1`,
                 listing.id,

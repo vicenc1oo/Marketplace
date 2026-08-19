@@ -1,5 +1,6 @@
 const listingModel = require('./listing.model');
 const authService = require('../auth/auth.service');
+const notificationService = require('../notifications/notification.service');
 const { createHttpError } = require('../../utils/response.utils');
 
 const CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'for_parts']);
@@ -9,6 +10,15 @@ const SORTS = new Set(['recent', 'price_asc', 'price_desc', 'popular']);
 
 async function attachSeller(listing) {
     return { ...listing, seller: await authService.findUserById(listing.sellerId) };
+}
+
+function auctionDetailsChanged(before, after) {
+    const fields = [
+        'title', 'description', 'category', 'condition', 'location',
+        'type', 'status', 'startingBid', 'endsAt',
+    ];
+    return fields.some((field) => String(before[field] ?? '') !== String(after[field] ?? ''))
+        || JSON.stringify(before.images || []) !== JSON.stringify(after.images || []);
 }
 
 async function attachSellers(listings) {
@@ -174,7 +184,16 @@ async function updateListing(userId, id, payload) {
 async function deleteListing(userId, id) {
     const existing = await requireOwnedListing(userId, id);
     await listingModel.remove(existing.id);
-    return { ok: true };
+    const updated = await listingModel.update(existing.id, data);
+
+    if (existing.type === 'auction' && auctionDetailsChanged(existing, updated)) {
+        await notificationService.createAuctionNotifications(existing.id, {
+            excludeUserId: userId,
+            type: 'auction',
+            text: `Auction “${updated.title}” was updated by the seller.`,
+        }).catch(() => {});
+    }
+    return attachSeller(updated);
 }
 
 async function toggleFavorite(userId, id) {

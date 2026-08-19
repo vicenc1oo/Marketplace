@@ -1,13 +1,16 @@
+const http = require('http');
 const app = require('./app');
 const { env } = require('./config/env');
-const { testDatabaseConnection } = require('./config/db');
-const { seedCategoriesTable } = require('./db/seeds/categories.seed');
+const { pool, testDatabaseConnection } = require('./config/db');
+const { initializeSocketServer } = require('./socket');
 
 async function startServer() {
   await testDatabaseConnection();
-  await seedCategoriesTable();
 
-  const server = app.listen(env.port, () => {
+  const server = http.createServer(app);
+  const io = initializeSocketServer(server);
+
+  server.listen(env.port, () => {
     // eslint-disable-next-line no-console
     console.log(`API listening on http://localhost:${env.port}${env.apiPrefix}`);
   });
@@ -15,7 +18,12 @@ async function startServer() {
   function shutdown(signal) {
     // eslint-disable-next-line no-console
     console.log(`${signal} received, shutting down API.`);
-    server.close(() => process.exit(0));
+    io.close(() => {
+      server.close(async () => {
+        await pool.end();
+        process.exit(0);
+      });
+    });
   }
 
   process.on('SIGINT', () => shutdown('SIGINT'));

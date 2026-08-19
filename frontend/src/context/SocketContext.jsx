@@ -1,6 +1,7 @@
 import { createContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { getToken, USE_MOCKS } from '../services/api.js';
+import { useAuth } from '../hooks/useAuth.js';
 
 // Owns the single socket.io connection for chat, bidding and notifications.
 // In mock mode it stays disconnected but still exposes subscribe()/emit().
@@ -9,13 +10,14 @@ export const SocketContext = createContext(null);
 const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3000';
 
 export function SocketProvider({ children }) {
+  const { user } = useAuth();
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     if (USE_MOCKS) return; // No live server in mock mode.
     const token = getToken();
-    if (!token) return;
+    if (!token || !user) return;
 
     const socket = io(WS_URL, {
       auth: { token },
@@ -33,7 +35,7 @@ export function SocketProvider({ children }) {
       socketRef.current = null;
       setConnected(false);
     };
-  }, []);
+  }, [user?.id]);
 
   // Subscribe to an event; returns an unsubscribe function (no-op in mock mode).
   const subscribe = (event, handler) => {
