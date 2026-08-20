@@ -10,3 +10,5 @@ frontend/.env
 # Tooling / session artifacts — never commit
 .playwright-mcp/
 .remember/
+
+todo.txt

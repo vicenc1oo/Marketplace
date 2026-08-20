@@ -6,6 +6,7 @@ const { optionalAuth } = require('./middleware/auth.middleware');
 const analyticsRoutes = require('./features/analytics/analytics.routes');
 const authRoutes = require('./features/auth/auth.routes');
 const biddingRoutes = require('./features/bidding/bidding.routes');
+const chatRoutes = require('./features/chat/chat.routes');
 const currencyRoutes = require('./features/currency/currency.routes');
 const { listingRouter, categoryRouter } = require('./features/listings/listing.routes')
 const notificationRoutes = require('./features/notifications/notification.routes');
@@ -35,6 +36,7 @@ app.use(optionalAuth);
 app.use(`${env.apiPrefix}/analytics`, analyticsRoutes);
 app.use(`${env.apiPrefix}/bidding`, biddingRoutes);
 app.use(`${env.apiPrefix}/categories`, categoryRouter);
+app.use(`${env.apiPrefix}/chat`, chatRoutes);
 app.use(`${env.apiPrefix}/currency`, currencyRoutes);
 app.use(`${env.apiPrefix}/listings`, listingRouter);
 app.use(`${env.apiPrefix}/notifications`, notificationRoutes);

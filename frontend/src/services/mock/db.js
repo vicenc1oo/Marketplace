@@ -5,17 +5,6 @@ import { placeholderImage, placeholderAvatar } from '../../utils/placeholder.js'
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
 const hoursFromNow = (n) => new Date(Date.now() + n * 3600000).toISOString();
 
-export const categories = [
-  { id: 'electronics', name: 'Electronics', icon: 'device' },
-  { id: 'home', name: 'Home & Garden', icon: 'home' },
-  { id: 'fashion', name: 'Fashion', icon: 'tag' },
-  { id: 'bikes', name: 'Bikes', icon: 'bike' },
-  { id: 'books', name: 'Books & Media', icon: 'book' },
-  { id: 'furniture', name: 'Furniture', icon: 'sofa' },
-  { id: 'sports', name: 'Sports', icon: 'ball' },
-  { id: 'kids', name: 'Kids', icon: 'toy' },
-];
-
 export const users = [
   {
     id: 'u1',

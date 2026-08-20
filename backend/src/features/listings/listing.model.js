@@ -1,16 +1,39 @@
 const crypto = require('crypto');
 const { pool, query } = require('../../config/db');
 
+const CATEGORY_BY_NAME = {
+    // Inglês
+    'Electronics': 'electronics',
+    'Home & Garden': 'home',
+    'Fashion': 'fashion',
+    'Bikes': 'bikes',
+    'Books & Media': 'books',
+    'Furniture': 'furniture',
+    'Sports': 'sports',
+    'Kids': 'kids',
+
+    // Português
+    'Eletrônicos': 'electronics',
+    'Casa & Jardim': 'home',
+    'Moda': 'fashion',
+    'Bicicletas': 'bikes',
+    'Livros & Mídia': 'books',
+    'Móveis': 'furniture',
+    'Esportes': 'sports',
+    'Crianças': 'kids',
+    'Infantil': 'kids',
+};
+
 const LISTING_SELECT = `
-    SELECT
-        l.*,
-        COALESCE(
-                json_agg(li.image_url ORDER BY li.position)
-                FILTER (WHERE li.id IS NOT NULL),
-                '[]'::json
-        ) AS images
-    FROM listings l
-             LEFT JOIN listing_images li ON li.listing_id = l.id
+   SELECT
+       l.*,
+       COALESCE(
+               json_agg(li.image_url ORDER BY li.position)
+               FILTER (WHERE li.id IS NOT NULL),
+               '[]'::json
+       ) AS images
+   FROM listings l
+            LEFT JOIN listing_images li ON li.listing_id = l.id
 `;
 
 function makeId(prefix) {
@@ -55,14 +78,57 @@ function listingGroupAndOrder(orderBy = 'l.created_at DESC') {
     return `GROUP BY l.id ORDER BY ${orderBy}`;
 }
 
+function normalizeCategoryId(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+
+    // Tenta encontrar no mapa de nomes (exato)
+    if (CATEGORY_BY_NAME[raw]) {
+        return CATEGORY_BY_NAME[raw];
+    }
+
+    // Tenta encontrar por correspondência case insensitive
+    const lowerRaw = raw.toLowerCase();
+    for (const [key, id] of Object.entries(CATEGORY_BY_NAME)) {
+        if (key.toLowerCase() === lowerRaw) {
+            return id;
+        }
+    }
+
+    // Se não encontrar, retorna o valor original
+    return raw;
+}
+
 async function listCategories() {
     const result = await query('SELECT id, name, icon FROM categories ORDER BY name ASC');
     return result.rows;
 }
 
 async function categoryExists(categoryId) {
-    const result = await query('SELECT 1 FROM categories WHERE id = $1', [categoryId]);
+    const normalized = normalizeCategoryId(categoryId);
+
+    // Verifica se a categoria existe por ID ou nome (case insensitive)
+    const result = await query(
+        `SELECT 1 FROM categories 
+         WHERE LOWER(id) = LOWER($1) 
+         OR LOWER(name) = LOWER($1)`,
+        [normalized]
+    );
     return result.rowCount > 0;
+}
+
+async function getCategoryId(categoryValue) {
+    const normalized = normalizeCategoryId(categoryValue);
+
+    // Busca o ID da categoria por ID ou nome
+    const result = await query(
+        `SELECT id FROM categories 
+         WHERE LOWER(id) = LOWER($1) 
+         OR LOWER(name) = LOWER($1)`,
+        [normalized]
+    );
+
+    return result.rows[0]?.id || null;
 }
 
 async function list({ filters = {}, page = 1, limit = 12, sort = 'recent' } = {}) {
@@ -74,7 +140,11 @@ async function list({ filters = {}, page = 1, limit = 12, sort = 'recent' } = {}
         clauses.push(sql.replace('?', `$${values.length}`));
     }
 
-    if (filters.category) addFilter('l.category_id = ?', filters.category);
+    if (filters.category) {
+        // Tenta obter o ID correto da categoria
+        const categoryId = await getCategoryId(filters.category) || normalizeCategoryId(filters.category);
+        addFilter('l.category_id = ?', categoryId);
+    }
     if (filters.location) addFilter('LOWER(l.location) = LOWER(?)', filters.location);
     if (filters.condition) addFilter('l.condition = ?', filters.condition);
     if (filters.type) addFilter('l.type = ?', filters.type);
@@ -165,6 +235,10 @@ async function insert(data) {
     const id = makeId('listing');
     try {
         await client.query('BEGIN');
+
+        // Obtém o ID correto da categoria
+        const categoryId = await getCategoryId(data.category) || data.category;
+
         await client.query(
             `INSERT INTO listings (
          id, seller_id, title, description, price, currency, category_id,
@@ -177,7 +251,7 @@ async function insert(data) {
        )`,
             [
                 id, data.sellerId, data.title, data.description, data.price, data.currency,
-                data.category, data.condition, data.location, data.type, data.status,
+                categoryId, data.condition, data.location, data.type, data.status,
                 data.favoritesCount, data.viewsCount, data.startingBid ?? null,
                 data.currentBid ?? null, data.bidsCount ?? 0, data.endsAt ?? null,
             ],
@@ -197,6 +271,10 @@ async function update(id, data) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        // Obtém o ID correto da categoria
+        const categoryId = await getCategoryId(data.category) || data.category;
+
         const result = await client.query(
             `UPDATE listings SET
          title = $2, description = $3, price = $4, category_id = $5,
@@ -205,7 +283,7 @@ async function update(id, data) {
          ends_at = $13, updated_at = NOW()
        WHERE id = $1`,
             [
-                id, data.title, data.description, data.price, data.category,
+                id, data.title, data.description, data.price, categoryId,
                 data.condition, data.location, data.type, data.status,
                 data.type === 'auction' ? data.startingBid : null,
                 data.type === 'auction' ? data.currentBid : null,
@@ -285,6 +363,7 @@ async function toggleFavorite(userId, listingId) {
 module.exports = {
     listCategories,
     categoryExists,
+    getCategoryId,
     list,
     listBy,
     findById,

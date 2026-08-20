@@ -14,7 +14,18 @@ export class ApiError extends Error {
   }
 }
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false';
+
+export const getToken = () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  if (!USE_MOCKS && token.startsWith('mock.')) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return token;
+};
+
 export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
@@ -60,5 +71,3 @@ export const apiPut = (path, body, options) =>
   request(path, { ...options, method: 'PUT', body });
 export const apiDelete = (path, options) => request(path, { ...options, method: 'DELETE' });
 
-// Serve local mock data unless VITE_USE_MOCKS=false (defaults to ON).
-export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false';

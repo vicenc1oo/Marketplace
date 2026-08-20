@@ -3,6 +3,16 @@ const authService = require('../auth/auth.service');
 const notificationService = require('../notifications/notification.service');
 const { createHttpError } = require('../../utils/response.utils');
 
+const CATEGORIES = new Set([
+    'Electronics',
+    'Home & Garden',
+    'Fashion',
+    'Bikes',
+    'Books & Media',
+    'Furniture',
+    'Sports',
+    'Kids',
+]);
 const CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'for_parts']);
 const TYPES = new Set(['fixed', 'auction']);
 const STATUSES = new Set(['active', 'sold', 'inactive']);
@@ -61,14 +71,26 @@ async function validatePayload(payload, existing = null) {
     const condition = String(source.condition || '').trim();
     const type = String(source.type || '').trim();
 
-    if (!await listingModel.categoryExists(category)) throw createHttpError(400, 'Category is invalid.');
-    if (!CONDITIONS.has(condition)) throw createHttpError(400, 'Condition is invalid.');
-    if (!TYPES.has(type)) throw createHttpError(400, 'Listing type is invalid.');
+    // Validação da categoria - verifica se existe no banco
+    const categoryExists = await listingModel.categoryExists(category);
+    if (!categoryExists) {
+        throw createHttpError(400, 'Categoria inválida. Por favor, selecione uma categoria válida.');
+    }
+
+    // Validação da condição
+    if (!CONDITIONS.has(condition)) {
+        throw createHttpError(400, 'Condição inválida. Por favor, selecione uma condição válida.');
+    }
+
+    // Validação do tipo
+    if (!TYPES.has(type)) {
+        throw createHttpError(400, 'Tipo de anúncio inválido.');
+    }
 
     const result = {
         title,
         description,
-        category,
+        category, // Mantém o valor original, o model vai resolver para o ID correto
         condition,
         location,
         type,
@@ -184,16 +206,17 @@ async function updateListing(userId, id, payload) {
 async function deleteListing(userId, id) {
     const existing = await requireOwnedListing(userId, id);
     await listingModel.remove(existing.id);
-    const updated = await listingModel.update(existing.id, data);
 
-    if (existing.type === 'auction' && auctionDetailsChanged(existing, updated)) {
+    // Envia notificação se for um leilão
+    if (existing.type === 'auction') {
         await notificationService.createAuctionNotifications(existing.id, {
             excludeUserId: userId,
             type: 'auction',
-            text: `Auction “${updated.title}” was updated by the seller.`,
+            text: `Leilão “${existing.title}” foi cancelado pelo vendedor.`,
         }).catch(() => {});
     }
-    return attachSeller(updated);
+
+    return { message: 'Anúncio deletado com sucesso', listingId: existing.id };
 }
 
 async function toggleFavorite(userId, id) {

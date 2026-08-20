@@ -3,8 +3,8 @@
 import * as db from './db.js';
 
 const clone = (value) => (typeof structuredClone === 'function'
-  ? structuredClone(value)
-  : JSON.parse(JSON.stringify(value)));
+    ? structuredClone(value)
+    : JSON.parse(JSON.stringify(value)));
 
 const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 const uid = (prefix) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -65,24 +65,19 @@ export async function getReviews(userId) {
   await delay();
   // Lightweight derived reviews so a profile never looks empty.
   return db.users
-    .filter((u) => u.id !== userId)
-    .slice(0, 2)
-    .map((author, i) => ({
-      id: `r_${userId}_${i}`,
-      authorId: author.id,
-      author: clone(author),
-      rating: 5 - i,
-      text: i === 0 ? 'Smooth transaction, item exactly as described.' : 'Friendly and quick to reply. Would buy again.',
-      createdAt: new Date(Date.now() - (i + 1) * 7 * 86400000).toISOString(),
-    }));
+      .filter((u) => u.id !== userId)
+      .slice(0, 2)
+      .map((author, i) => ({
+        id: `r_${userId}_${i}`,
+        authorId: author.id,
+        author: clone(author),
+        rating: 5 - i,
+        text: i === 0 ? 'Smooth transaction, item exactly as described.' : 'Friendly and quick to reply. Would buy again.',
+        createdAt: new Date(Date.now() - (i + 1) * 7 * 86400000).toISOString(),
+      }));
 }
 
 /* --------------------------------- listings -------------------------------- */
-export async function getCategories() {
-  await delay(120);
-  return clone(db.categories);
-}
-
 export async function listListings(params = {}) {
   await delay();
   const { category, location, minPrice, maxPrice, condition, type, q, sort = 'recent', page = 1, limit = 12 } = params;
@@ -97,7 +92,7 @@ export async function listListings(params = {}) {
   if (q) {
     const needle = q.toLowerCase();
     items = items.filter(
-      (l) => l.title.toLowerCase().includes(needle) || l.description.toLowerCase().includes(needle),
+        (l) => l.title.toLowerCase().includes(needle) || l.description.toLowerCase().includes(needle),
     );
   }
 
@@ -128,19 +123,19 @@ export async function getListing(id) {
 export async function getFeatured() {
   await delay();
   return [...db.listings]
-    .filter((l) => l.status === 'active')
-    .sort((a, b) => b.favoritesCount - a.favoritesCount)
-    .slice(0, 4)
-    .map(withSeller);
+      .filter((l) => l.status === 'active')
+      .sort((a, b) => b.favoritesCount - a.favoritesCount)
+      .slice(0, 4)
+      .map(withSeller);
 }
 
 export async function getRecent() {
   await delay();
   return [...db.listings]
-    .filter((l) => l.status === 'active')
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 8)
-    .map(withSeller);
+      .filter((l) => l.status === 'active')
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 8)
+      .map(withSeller);
 }
 
 export async function createListing(data) {
@@ -232,6 +227,36 @@ export async function getConversation(id) {
   };
 }
 
+export async function startConversation(listingId, text) {
+  await delay(150);
+  const listing = db.listings.find((item) => item.id === listingId);
+  if (!listing) throw new Error('Listing not found');
+
+  let conversation = db.conversations.find(
+      (item) => item.listingId === listingId
+          && item.participantIds.includes(db.CURRENT_USER_ID)
+          && item.participantIds.includes(listing.sellerId),
+  );
+  if (!conversation) {
+    conversation = {
+      id: uid('c'),
+      participantIds: [db.CURRENT_USER_ID, listing.sellerId],
+      listingId,
+      messages: [],
+    };
+    db.conversations.unshift(conversation);
+  }
+
+  conversation.messages.push({
+    id: uid('m'),
+    senderId: db.CURRENT_USER_ID,
+    text: String(text).trim(),
+    createdAt: new Date().toISOString(),
+    read: false,
+  });
+  return getConversation(conversation.id);
+}
+
 export async function sendMessage(conversationId, text) {
   await delay(120);
   const c = db.conversations.find((x) => x.id === conversationId);
@@ -245,16 +270,16 @@ export async function sendMessage(conversationId, text) {
 export async function getActiveAuctions() {
   await delay();
   return db.listings
-    .filter((l) => l.type === 'auction' && l.status === 'active')
-    .map(withSeller);
+      .filter((l) => l.type === 'auction' && l.status === 'active')
+      .map(withSeller);
 }
 
 export async function getBids(listingId) {
   await delay();
   return db.bids
-    .filter((b) => b.listingId === listingId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map((b) => ({ ...clone(b), bidder: publicUser(b.bidderId) }));
+      .filter((b) => b.listingId === listingId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((b) => ({ ...clone(b), bidder: publicUser(b.bidderId) }));
 }
 
 export async function placeBid(listingId, amount) {
@@ -348,8 +373,8 @@ export async function getDashboardStats() {
     soldItems: mine.filter((l) => l.status === 'sold').length,
     activeBids: db.bids.filter((b) => b.bidderId === db.CURRENT_USER_ID).length,
     unreadMessages: db.conversations.reduce(
-      (sum, c) => sum + c.messages.filter((m) => m.senderId !== db.CURRENT_USER_ID && !m.read).length,
-      0,
+        (sum, c) => sum + c.messages.filter((m) => m.senderId !== db.CURRENT_USER_ID && !m.read).length,
+        0,
     ),
     savedListings: favorites.size,
     totalViews: mine.reduce((sum, l) => sum + l.viewsCount, 0),

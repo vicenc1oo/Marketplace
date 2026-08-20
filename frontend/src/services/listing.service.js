@@ -3,6 +3,17 @@
 import { apiGet, apiPost, apiPut, apiDelete, USE_MOCKS } from './api.js';
 import * as mock from './mock/index.js';
 
+export const categories = [
+  { id: 'electronics', name: 'Electronics', icon: 'device' },
+  { id: 'home', name: 'Home & Garden', icon: 'home' },
+  { id: 'fashion', name: 'Fashion', icon: 'tag' },
+  { id: 'bikes', name: 'Bikes', icon: 'bike' },
+  { id: 'books', name: 'Books & Media', icon: 'book' },
+  { id: 'furniture', name: 'Furniture', icon: 'sofa' },
+  { id: 'sports', name: 'Sports', icon: 'ball' },
+  { id: 'kids', name: 'Kids', icon: 'toy' },
+];
+
 // Build a query string from a params object, skipping empty values.
 const query = (params = {}) => {
   const search = new URLSearchParams();
@@ -14,7 +25,7 @@ const query = (params = {}) => {
 };
 
 export const getCategories = () =>
-  USE_MOCKS ? mock.getCategories() : apiGet('/categories');
+  USE_MOCKS ? Promise.resolve(categories) : apiGet('/categories');
 
 export const listListings = (params) =>
   USE_MOCKS ? mock.listListings(params) : apiGet(`/listings${query(params)}`);
