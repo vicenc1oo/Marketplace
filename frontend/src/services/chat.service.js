@@ -4,12 +4,17 @@ import { apiGet, apiPost, USE_MOCKS } from './api.js';
 import * as mock from './mock/index.js';
 
 export const getConversations = () =>
-  USE_MOCKS ? mock.getConversations() : apiGet('/chat/conversations');
+    USE_MOCKS ? mock.getConversations() : apiGet('/chat/conversations');
 
 export const getConversation = (id) =>
-  USE_MOCKS ? mock.getConversation(id) : apiGet(`/chat/conversations/${id}`);
+    USE_MOCKS ? mock.getConversation(id) : apiGet(`/chat/conversations/${id}`);
+
+export const startConversation = (listingId, text) =>
+    USE_MOCKS
+        ? mock.startConversation(listingId, text)
+        : apiPost('/chat/conversations', { listingId, text });
 
 export const sendMessage = (conversationId, text) =>
-  USE_MOCKS
-    ? mock.sendMessage(conversationId, text)
-    : apiPost(`/chat/conversations/${conversationId}/messages`, { text });
+    USE_MOCKS
+        ? mock.sendMessage(conversationId, text)
+        : apiPost(`/chat/conversations/${conversationId}/messages`, { text });
