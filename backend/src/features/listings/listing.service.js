@@ -131,6 +131,18 @@ function parsePositiveInteger(value, fallback, maximum) {
     return number;
 }
 
+    /* This function collapses repeated whitespace before it reaches Postgres.
+       This keeps searches like "  road   bike " equivalent to "road bike" and
+       limits unusually long input before it is used in full-text/trigram ranking.
+    */
+
+function normalizeSearchQuery(value) {
+    if (value == null) return null;
+
+    const normalized = String(value).trim().replace(/\s+/g, ' ').slice(0, MAX_SEARCH_LENGTH);
+    return normalized || null;
+}
+
 async function listListings(query = {}) {
     const page = parsePositiveInteger(query.page, 1, 1000000);
     const limit = parsePositiveInteger(query.limit, 12, 100);
@@ -142,7 +154,7 @@ async function listListings(query = {}) {
         location: query.location ? String(query.location).trim() : null,
         condition: query.condition ? String(query.condition).trim() : null,
         type: query.type ? String(query.type).trim() : null,
-        q: query.q ? String(query.q).trim() : null,
+        q: normalizeSearchQuery(query.q),
     };
 
     if (query.minPrice != null && query.minPrice !== '') {

@@ -1,40 +1,81 @@
 const crypto = require('crypto');
 const { pool, query } = require('../../config/db');
 
-const CATEGORY_BY_NAME = {
-    // Inglês
-    'Electronics': 'electronics',
-    'Home & Garden': 'home',
-    'Fashion': 'fashion',
-    'Bikes': 'bikes',
-    'Books & Media': 'books',
-    'Furniture': 'furniture',
-    'Sports': 'sports',
-    'Kids': 'kids',
-
-    // Português
-    'Eletrônicos': 'electronics',
-    'Casa & Jardim': 'home',
-    'Moda': 'fashion',
-    'Bicicletas': 'bikes',
-    'Livros & Mídia': 'books',
-    'Móveis': 'furniture',
-    'Esportes': 'sports',
-    'Crianças': 'kids',
-    'Infantil': 'kids',
-};
-
 const LISTING_SELECT = `
-   SELECT
-       l.*,
-       COALESCE(
-               json_agg(li.image_url ORDER BY li.position)
-               FILTER (WHERE li.id IS NOT NULL),
-               '[]'::json
-       ) AS images
-   FROM listings l
-            LEFT JOIN listing_images li ON li.listing_id = l.id
+  SELECT
+    l.*,
+    COALESCE(
+      json_agg(li.image_url ORDER BY li.position)
+        FILTER (WHERE li.id IS NOT NULL),
+      '[]'::json
+    ) AS images
+  FROM listings l
+  LEFT JOIN listing_images li ON li.listing_id = l.id
 `;
+
+function listingSearchVectorSql() {
+    return `to_tsvector(
+    'simple',
+    COALESCE(l.title, '') || ' ' || COALESCE(l.description, '') || ' ' || COALESCE(l.location, '')
+  )`;
+}
+
+function categorySearchVectorSql() {
+    return "to_tsvector('simple', COALESCE(c.name, ''))";
+}
+
+function weightedSearchVectorSql() {
+    // Title/category matches should score above description/location matches.
+    // Filtering uses listingSearchVectorSql() so it can use the migration index;
+    // this weighted vector is only for ordering the matched rows by relevance.
+    return `(
+    setweight(to_tsvector('simple', COALESCE(l.title, '')), 'A') ||
+    setweight(to_tsvector('simple', COALESCE(c.name, '')), 'B') ||
+    setweight(to_tsvector('simple', COALESCE(l.location, '')), 'C') ||
+    setweight(to_tsvector('simple', COALESCE(l.description, '')), 'D')
+  )`;
+}
+
+function searchPredicateSql(searchParam) {
+    const listingVector = listingSearchVectorSql();
+    const categoryVector = categorySearchVectorSql();
+
+    // Combine full-text search, substring matches, and trigram similarity. This
+    // handles word-order changes ("bike road"), partial input ("iph"), and small
+    // typos ("iphne") while preserving the existing broad ILIKE behaviour.
+    return `(
+    ${listingVector} @@ websearch_to_tsquery('simple', ${searchParam})
+    OR ${categoryVector} @@ websearch_to_tsquery('simple', ${searchParam})
+    OR l.title ILIKE '%' || ${searchParam} || '%'
+    OR l.description ILIKE '%' || ${searchParam} || '%'
+    OR c.name ILIKE '%' || ${searchParam} || '%'
+    OR l.location ILIKE '%' || ${searchParam} || '%'
+    OR l.title % ${searchParam}
+    OR c.name % ${searchParam}
+    OR similarity(l.title, ${searchParam}) > 0.18
+    OR word_similarity(${searchParam}, l.title) > 0.55
+    OR word_similarity(${searchParam}, l.description) > 0.45
+    OR similarity(c.name, ${searchParam}) > 0.20
+  )`;
+}
+
+function searchRankSql(searchParam) {
+    const vector = weightedSearchVectorSql();
+
+    // Relevance favours exact/prefix title hits first, then full-text rank, then
+    // fuzzy title/category/description matches. The created date remains the final
+    // tie-breaker in list().
+    return `(
+    CASE WHEN LOWER(l.title) = LOWER(${searchParam}) THEN 10 ELSE 0 END +
+    CASE WHEN l.title ILIKE ${searchParam} || '%' THEN 5 ELSE 0 END +
+    CASE WHEN l.title ILIKE '%' || ${searchParam} || '%' THEN 2 ELSE 0 END +
+    ts_rank_cd(${vector}, websearch_to_tsquery('simple', ${searchParam})) * 8 +
+    GREATEST(similarity(l.title, ${searchParam}), word_similarity(${searchParam}, l.title)) * 4 +
+    GREATEST(similarity(c.name, ${searchParam}), word_similarity(${searchParam}, c.name)) * 3 +
+    word_similarity(${searchParam}, l.description) +
+    CASE WHEN l.location ILIKE '%' || ${searchParam} || '%' THEN 0.5 ELSE 0 END
+  )`;
+}
 
 function makeId(prefix) {
     return typeof crypto.randomUUID === 'function'
@@ -74,29 +115,8 @@ function toListing(row) {
     return listing;
 }
 
-function listingGroupAndOrder(orderBy = 'l.created_at DESC') {
-    return `GROUP BY l.id ORDER BY ${orderBy}`;
-}
-
-function normalizeCategoryId(value) {
-    const raw = String(value ?? '').trim();
-    if (!raw) return '';
-
-    // Tenta encontrar no mapa de nomes (exato)
-    if (CATEGORY_BY_NAME[raw]) {
-        return CATEGORY_BY_NAME[raw];
-    }
-
-    // Tenta encontrar por correspondência case insensitive
-    const lowerRaw = raw.toLowerCase();
-    for (const [key, id] of Object.entries(CATEGORY_BY_NAME)) {
-        if (key.toLowerCase() === lowerRaw) {
-            return id;
-        }
-    }
-
-    // Se não encontrar, retorna o valor original
-    return raw;
+function listingGroupAndOrder(orderBy = 'l.created_at DESC', extraGroupBy = []) {
+    return `GROUP BY ${['l.id', ...extraGroupBy].join(', ')} ORDER BY ${orderBy}`;
 }
 
 async function listCategories() {
@@ -105,46 +125,22 @@ async function listCategories() {
 }
 
 async function categoryExists(categoryId) {
-    const normalized = normalizeCategoryId(categoryId);
-
-    // Verifica se a categoria existe por ID ou nome (case insensitive)
-    const result = await query(
-        `SELECT 1 FROM categories 
-         WHERE LOWER(id) = LOWER($1) 
-         OR LOWER(name) = LOWER($1)`,
-        [normalized]
-    );
+    const result = await query('SELECT 1 FROM categories WHERE id = $1', [categoryId]);
     return result.rowCount > 0;
-}
-
-async function getCategoryId(categoryValue) {
-    const normalized = normalizeCategoryId(categoryValue);
-
-    // Busca o ID da categoria por ID ou nome
-    const result = await query(
-        `SELECT id FROM categories 
-         WHERE LOWER(id) = LOWER($1) 
-         OR LOWER(name) = LOWER($1)`,
-        [normalized]
-    );
-
-    return result.rows[0]?.id || null;
 }
 
 async function list({ filters = {}, page = 1, limit = 12, sort = 'recent' } = {}) {
     const clauses = ["l.status = 'active'"];
     const values = [];
+    const joins = [];
+    let searchParam = null;
 
     function addFilter(sql, value) {
         values.push(value);
         clauses.push(sql.replace('?', `$${values.length}`));
     }
 
-    if (filters.category) {
-        // Tenta obter o ID correto da categoria
-        const categoryId = await getCategoryId(filters.category) || normalizeCategoryId(filters.category);
-        addFilter('l.category_id = ?', categoryId);
-    }
+    if (filters.category) addFilter('l.category_id = ?', filters.category);
     if (filters.location) addFilter('LOWER(l.location) = LOWER(?)', filters.location);
     if (filters.condition) addFilter('l.condition = ?', filters.condition);
     if (filters.type) addFilter('l.type = ?', filters.type);
@@ -152,26 +148,31 @@ async function list({ filters = {}, page = 1, limit = 12, sort = 'recent' } = {}
     if (filters.maxPrice != null) addFilter('COALESCE(l.current_bid, l.price) <= ?', filters.maxPrice);
     if (filters.q) {
         values.push(filters.q);
-        clauses.push(
-            `(l.title ILIKE '%' || $${values.length} || '%'
-        OR l.description ILIKE '%' || $${values.length} || '%')`,
-        );
+        searchParam = `$${values.length}`;
+        joins.push('JOIN categories c ON c.id = l.category_id');
+        clauses.push(searchPredicateSql(searchParam));
     }
 
     const where = `WHERE ${clauses.join(' AND ')}`;
-    const countResult = await query(`SELECT COUNT(*)::int AS total FROM listings l ${where}`, values);
+    const joinSql = joins.join('\n');
+    const countResult = await query(`SELECT COUNT(*)::int AS total FROM listings l ${joinSql} ${where}`, values);
     const orderBy = {
         recent: 'l.created_at DESC',
         price_asc: 'COALESCE(l.current_bid, l.price) ASC',
         price_desc: 'COALESCE(l.current_bid, l.price) DESC',
         popular: 'l.favorites_count DESC',
     }[sort];
+    const searchOrderBy = searchParam && sort === 'recent'
+        ? `${searchRankSql(searchParam)} DESC, l.created_at DESC`
+        : orderBy;
+    const extraGroupBy = searchParam ? ['c.id'] : [];
 
     const pagedValues = [...values, limit, (page - 1) * limit];
     const result = await query(
         `${LISTING_SELECT}
+     ${joinSql}
      ${where}
-     ${listingGroupAndOrder(orderBy)}
+     ${listingGroupAndOrder(searchOrderBy, extraGroupBy)}
      LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
         pagedValues,
     );
@@ -235,10 +236,6 @@ async function insert(data) {
     const id = makeId('listing');
     try {
         await client.query('BEGIN');
-
-        // Obtém o ID correto da categoria
-        const categoryId = await getCategoryId(data.category) || data.category;
-
         await client.query(
             `INSERT INTO listings (
          id, seller_id, title, description, price, currency, category_id,
@@ -251,7 +248,7 @@ async function insert(data) {
        )`,
             [
                 id, data.sellerId, data.title, data.description, data.price, data.currency,
-                categoryId, data.condition, data.location, data.type, data.status,
+                data.category, data.condition, data.location, data.type, data.status,
                 data.favoritesCount, data.viewsCount, data.startingBid ?? null,
                 data.currentBid ?? null, data.bidsCount ?? 0, data.endsAt ?? null,
             ],
@@ -271,10 +268,6 @@ async function update(id, data) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-
-        // Obtém o ID correto da categoria
-        const categoryId = await getCategoryId(data.category) || data.category;
-
         const result = await client.query(
             `UPDATE listings SET
          title = $2, description = $3, price = $4, category_id = $5,
@@ -283,7 +276,7 @@ async function update(id, data) {
          ends_at = $13, updated_at = NOW()
        WHERE id = $1`,
             [
-                id, data.title, data.description, data.price, categoryId,
+                id, data.title, data.description, data.price, data.category,
                 data.condition, data.location, data.type, data.status,
                 data.type === 'auction' ? data.startingBid : null,
                 data.type === 'auction' ? data.currentBid : null,
@@ -363,7 +356,6 @@ async function toggleFavorite(userId, listingId) {
 module.exports = {
     listCategories,
     categoryExists,
-    getCategoryId,
     list,
     listBy,
     findById,
