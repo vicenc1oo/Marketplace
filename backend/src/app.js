@@ -3,6 +3,7 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const { optionalAuth } = require('./middleware/auth.middleware');
+const agentRoutes = require('./features/ai-agent/agent.routes');
 const analyticsRoutes = require('./features/analytics/analytics.routes');
 const authRoutes = require('./features/auth/auth.routes');
 const biddingRoutes = require('./features/bidding/bidding.routes');
@@ -31,6 +32,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+app.use(`${env.apiPrefix}/ai-agent/conversations`, agentRoutes);
 app.use(`${env.apiPrefix}/auth`, authRoutes);
 app.use(optionalAuth);
 app.use(`${env.apiPrefix}/analytics`, analyticsRoutes);

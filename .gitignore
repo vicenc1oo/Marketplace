@@ -26,3 +26,7 @@ backend/uploads/*
 !backend/uploads/listings/.gitkeep
 
 *:Zone.Identifier
+
+# Secrets
+
+.secrets/

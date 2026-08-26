@@ -13,5 +13,8 @@
   "private": true,
   "devDependencies": {
     "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "groq-sdk": "^1.6.0"
   }
 }
