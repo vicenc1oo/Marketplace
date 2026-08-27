@@ -3,10 +3,12 @@ services:
     image: postgres:16
     container_name: marketplace-postgres
     restart: unless-stopped
+    secrets:
+      - db_password
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -24,6 +26,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    secrets:
+      - db_password
+      - jwt_secret
+      - groq_api_key
     env_file:
       - .env
     environment:
@@ -32,7 +38,13 @@ services:
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      GROQ_API_KEY_FILE: /run/secrets/groq_api_key
+      GROQ_MODEL: ${GROQ_MODEL}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-400}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-12000}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-1}
     volumes:
       - backend_data:/app/data
       - backend_uploads:/app/uploads
@@ -70,3 +82,11 @@ volumes:
   backend_data:
   backend_uploads:
   postgres_data:
+
+secrets:
+  db_password:
+    file: ./.secrets/db_password
+  jwt_secret:
+    file: ./.secrets/jwt_secret
+  groq_api_key:
+    file: ./.secrets/groq_api_key
