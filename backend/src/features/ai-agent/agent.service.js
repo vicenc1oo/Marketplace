@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const Groq = require('groq-sdk');
 const { env } = require('../../config/env');
 const { pool, query } = require('../../config/db');
@@ -209,6 +209,99 @@ function accumulateToolCall(toolCalls, fragment) {
     }
 }
 
+async function consumeReplyStream(stream, onFragment) {
+    const toolCalls = [];
+    let completeResponse = '';
+    let finishReason = null;
+    let responseType = null;
+
+    for await (const chunk of stream) {
+        const choice = chunk.choices[0];
+
+        if (!choice) {
+            continue;
+        }
+
+        if (choice.finish_reason) {
+            finishReason = choice.finish_reason;
+        }
+
+        const toolCallFragments = choice.delta?.tool_calls || [];
+
+        if (toolCallFragments.length) {
+            if (responseType === 'text') {
+                throw createHttpError(
+                    502,
+                    'AI assistant returned text before requesting a tool.',
+                );
+            }
+
+            responseType = 'tool';
+
+            for (const fragment of toolCallFragments) {
+                accumulateToolCall(toolCalls, fragment);
+            }
+        }
+
+        const textFragment = choice.delta?.content || '';
+
+        if (textFragment && responseType !== 'tool') {
+            responseType = 'text';
+            completeResponse += textFragment;
+            onFragment(textFragment);
+        }
+    }
+
+    return {
+        toolCalls,
+        completeResponse,
+        finishReason,
+    };
+}
+
+function getCompletedResponse(finishReason, completeResponse, toolCalls) {
+    if (!finishReason) {
+        throw createHttpError(
+            502,
+            'AI assistant stream ended unexpectedly.',
+        );
+    }
+
+    const completedToolCalls = toolCalls.filter(Boolean);
+
+    if (completedToolCalls.length) {
+        return { completedToolCalls };
+    }
+
+    if (!completeResponse.trim()) {
+        throw createHttpError(
+            502,
+            'AI assistant returned an empty response.',
+        );
+    }
+
+    return {
+        content: completeResponse,
+        finishReason,
+    };
+}
+
+async function appendToolResults(groqMessages, userId, toolCalls) {
+    for (const toolCall of toolCalls) {
+        const toolResult = await executeToolCall(
+            userId,
+            toolCall,
+        );
+
+        groqMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: JSON.stringify(toolResult),
+        });
+    }
+}
+
 async function generateReplyStream(userId, messages, onFragment, signal) {
     if (typeof onFragment !== 'function') {
         throw new TypeError('onFragment must be a function.');
@@ -236,47 +329,7 @@ async function generateReplyStream(userId, messages, onFragment, signal) {
                 signal,
             });
 
-        const toolCalls = [];
-        let completeResponse = '';
-        let finishReason = null;
-        let responseType = null;
-
-        for await (const chunk of stream) {
-            const choice = chunk.choices[0];
-
-            if (!choice) {
-                continue;
-            }
-
-            if (choice.finish_reason) {
-                finishReason = choice.finish_reason;
-            }
-
-            const toolCallFragments = choice.delta?.tool_calls || [];
-
-            if (toolCallFragments.length) {
-                if (responseType === 'text') {
-                    throw createHttpError(
-                        502,
-                        'AI assistant returned text before requesting a tool.',
-                    );
-                }
-
-                responseType = 'tool';
-
-                for (const fragment of toolCallFragments) {
-                    accumulateToolCall(toolCalls, fragment);
-                }
-            }
-
-            const textFragment = choice.delta?.content || '';
-
-            if (textFragment && responseType !== 'tool') {
-                responseType = 'text';
-                completeResponse += textFragment;
-                onFragment(textFragment);
-            }
-        }
+        const streamResult = await consumeReplyStream(stream, onFragment);
 
         if (signal?.aborted) {
             throw createHttpError(
@@ -285,48 +338,27 @@ async function generateReplyStream(userId, messages, onFragment, signal) {
             );
         }
 
-        if (!finishReason) {
-            throw createHttpError(
-                502,
-                'AI assistant stream ended unexpectedly.',
-            );
-        }
+        const response = getCompletedResponse(
+            streamResult.finishReason,
+            streamResult.completeResponse,
+            streamResult.toolCalls,
+        );
 
-        const completedToolCalls = toolCalls.filter(Boolean);
-
-        if (!completedToolCalls.length) {
-            if (!completeResponse.trim()) {
-                throw createHttpError(
-                    502,
-                    'AI assistant returned an empty response.',
-                );
-            }
-
-            return {
-                content: completeResponse,
-                finishReason,
-            };
+        if (!response.completedToolCalls) {
+            return response;
         }
 
         groqMessages.push({
             role: 'assistant',
             content: null,
-            tool_calls: completedToolCalls,
+            tool_calls: response.completedToolCalls,
         });
 
-        for (const toolCall of completedToolCalls) {
-            const toolResult = await executeToolCall(
-                userId,
-                toolCall,
-            );
-
-            groqMessages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                name: toolCall.function.name,
-                content: JSON.stringify(toolResult),
-            });
-        }
+        await appendToolResults(
+            groqMessages,
+            userId,
+            response.completedToolCalls,
+        );
     }
 
     throw createHttpError(

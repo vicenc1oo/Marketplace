@@ -1,6 +1,9 @@
 const agentService = require('./agent.service');
 const { sendJson } = require('../../utils/response.utils');
 
+const STREAM_ERROR_MESSAGE =
+    'Unable to process the request. Please try again later.';
+
 function openEventStream(res, statusCode = 200) {
     res.status(statusCode);
     res.set({
@@ -68,7 +71,7 @@ async function createConversationStream(req, res, next) {
 
         if (res.headersSent) {
             writeStreamEvent(res, 'error', {
-                message: error.message,
+                message: STREAM_ERROR_MESSAGE,
             });
 
             return res.end();
@@ -107,7 +110,7 @@ async function sendMessageStream(req, res, next) {
     const signal = createAbortSignal(res);
 
     try {
-        const userMessage = await agentService.addMessage(
+        await agentService.addMessage(
             req.user.id,
             req.params.conversationId,
             'user',
@@ -116,10 +119,7 @@ async function sendMessageStream(req, res, next) {
 
         openEventStream(res);
 
-        writeStreamEvent(res, 'start', {
-            conversationId: req.params.conversationId,
-            message: userMessage,
-        });
+        writeStreamEvent(res, 'start', {});
 
         const assistantMessage =
             await agentService.generateConversationReplyStream(
@@ -145,7 +145,7 @@ async function sendMessageStream(req, res, next) {
 
         if (res.headersSent) {
             writeStreamEvent(res, 'error', {
-                message: error.message,
+                message: STREAM_ERROR_MESSAGE,
             });
 
             return res.end();
